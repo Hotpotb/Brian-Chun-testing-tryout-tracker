@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bay Harbor Red Wings — Tryout Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --red: #C8102E;
+      --red-dark: #9B0C23;
+      --red-light: #FDEAED;
+      --gold: #FFB81C;
+      --gray-50: #F9FAFB;
+      --gray-100: #F3F4F6;
+      --gray-200: #E5E7EB;
+      --gray-400: #9CA3AF;
+      --gray-600: #4B5563;
+      --gray-800: #1F2937;
+      --white: #FFFFFF;
+      --green: #15803D;
+      --green-light: #DCFCE7;
+      --blue: #1D4ED8;
+      --blue-light: #DBEAFE;
+      --radius: 10px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--gray-50);
+      color: var(--gray-800);
+      min-height: 100vh;
+    }
+
+    /* HEADER */
+    .header {
+      background: var(--red);
+      color: white;
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-logo {
+      width: 36px; height: 36px; background: var(--gold);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 14px; color: var(--red-dark); flex-shrink: 0;
+    }
+    .header-title { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+    .header-sub { font-size: 11px; opacity: 0.8; margin-top: 1px; }
+    .live-badge {
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(255,255,255,0.15); border-radius: 99px;
+      padding: 4px 10px; font-size: 12px; font-weight: 500;
+    }
+    .live-dot {
+      width: 7px; height: 7px; background: var(--gold);
+      border-radius: 50%; animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* TABS */
+    .tabs {
+      background: white;
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      padding: 0 1.5rem;
+      gap: 0;
+    }
+    .tab {
+      padding: 14px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gray-400);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .tab.active { color: var(--red); border-bottom-color: var(--red); }
+    .tab:hover:not(.active) { color: var(--gray-600); }
+
+    /* MAIN */
+    .main { padding: 1.25rem 1.5rem; max-width: 1100px; margin: 0 auto; }
+
+    /* STATS ROW */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 1.25rem;
+    }
+    .stat-card {
+      background: white;
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--gray-200);
+    }
+    .stat-num { font-size: 28px; font-weight: 700; line-height: 1; }
+    .stat-label { font-size: 12px; color: var(--gray-400); margin-top: 4px; }
+
+    /* ADD PLAYER FORM */
+    .add-card {
+      background: white;
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--gray-200);
+      margin-bottom: 1.25rem;
+    }
+    .add-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 1rem; color: var(--gray-600); }
+    .form-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px; align-items: end; }
+    .form-group label { display: block; font-size: 11px; font-weight: 500; color: var(--gray-400); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+    input, select {
+      width: 100%; padding: 9px 12px; border: 1px solid var(--gray-200);
+      border-radius: 8px; font-size: 14px; color: var(--gray-800);
+      background: var(--gray-50); outline: none; transition: border 0.15s;
+    }
+    input:focus, select:focus { border-color: var(--red); background: white; }
+    .btn {
+      padding: 9px 18px; border-radius: 8px; font-size: 14px;
+      font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-primary { background: var(--red); color: white; }
+    .btn-primary:hover { background: var(--red-dark); }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-outline { background: white; color: var(--gray-600); border: 1px solid var(--gray-200); }
+    .btn-outline:hover { border-color: var(--gray-400); }
+
+    /* IMPORT BAR */
+    .import-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; background: var(--gray-50);
+      border-radius: 8px; border: 1px dashed var(--gray-200);
+      margin-bottom: 1rem; font-size: 13px; color: var(--gray-400);
+    }
+    .import-bar input[type=file] { font-size: 13px; color: var(--gray-600); }
+    #import-msg { font-size: 12px; color: var(--green); font-weight: 500; }
+
+    /* FILTERS */
+    .filters {
+      display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; align-items: center;
+    }
+    .filters select { width: auto; font-size: 13px; padding: 7px 10px; }
+    .filter-label { font-size: 13px; color: var(--gray-400); }
+
+    /* TABLE */
+    .table-card {
+      background: white; border-radius: var(--radius);
+      box-shadow: var(--shadow); border: 1px solid var(--gray-200);
+      overflow: hidden;
+    }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead { background: var(--gray-50); border-bottom: 1px solid var(--gray-200); }
+    th {
+      padding: 10px 12px; text-align: left; font-size: 11px;
+      font-weight: 600; color: var(--gray-400); text-transform: uppercase;
+      letter-spacing: 0.04em; white-space: nowrap;
+    }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--gray-50); }
+
+    /* POSITION BADGE */
+    .pos {
+      display: inline-block; padding: 3px 8px; border-radius: 99px;
+      font-size: 11px; font-weight: 700;
+    }
+    .pos-C { background: #EDE9FE; color: #5B21B6; }
+    .pos-LW { background: #DCFCE7; color: #15803D; }
+    .pos-RW { background: #FEF3C7; color: #92400E; }
+    .pos-D { background: #DBEAFE; color: #1D4ED8; }
+    .pos-G { background: #FFE4E6; color: #9F1239; }
+
+    /* STARS */
+    .stars { display: flex; gap: 2px; }
+    .star { font-size: 16px; cursor: pointer; color: var(--gray-200); line-height: 1; transition: color 0.1s; }
+    .star.on { color: var(--gold); }
+    .star:hover { color: var(--gold); }
+
+    /* DESIGNATION */
+    .desig {
+      display: inline-block; padding: 4px 10px; border-radius: 99px;
+      font-size: 11px; font-weight: 600;
+    }
+    .desig-Selected { background: var(--green-light); color: var(--green); }
+    .desig-Called { background: var(--blue-light); color: var(--blue); }
+    .desig-Released { background: #FEE2E2; color: #991B1B; }
+    .desig-Pending { background: var(--gray-100); color: var(--gray-400); }
+
+    select.desig-select {
+      font-size: 12px; padding: 4px 8px; border-radius: 99px;
+      font-weight: 600; border: 1px solid var(--gray-200); width: auto;
+      background: var(--gray-50);
+    }
+
+    /* NOTES */
+    .note-input {
+      width: 100%; font-size: 12px; padding: 4px 8px;
+      border: 1px solid transparent; border-radius: 6px;
+      background: transparent; color: var(--gray-800);
+    }
+    .note-input:focus { border-color: var(--gray-200); background: white; outline: none; }
+
+    /* AVG SCORE */
+    .avg-high { color: var(--green); font-weight: 700; }
+    .avg-mid { color: #D97706; font-weight: 700; }
+    .avg-low { color: #DC2626; font-weight: 700; }
+
+    /* DELETE BTN */
+    .del-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--gray-200); font-size: 16px; padding: 4px;
+      border-radius: 6px; line-height: 1; transition: color 0.15s;
+    }
+    .del-btn:hover { color: #DC2626; }
+
+    /* EMPTY STATE */
+    .empty {
+      text-align: center; padding: 3rem; color: var(--gray-400);
+    }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty h3 { font-size: 16px; font-weight: 600; color: var(--gray-600); margin-bottom: 6px; }
+    .empty p { font-size: 14px; }
+
+    /* RESULTS TAB */
+    .results-group { margin-bottom: 1.25rem; }
+    .results-group-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-radius: var(--radius) var(--radius) 0 0;
+      font-size: 14px; font-weight: 700; border: 1px solid;
+      border-bottom: none;
+    }
+    .rh-selected { background: var(--green-light); color: var(--green); border-color: #86EFAC; }
+    .rh-called { background: var(--blue-light); color: var(--blue); border-color: #93C5FD; }
+    .rh-released { background: #FEE2E2; color: #991B1B; border-color: #FCA5A5; }
+    .results-group-body {
+      background: white; border: 1px solid var(--gray-200);
+      border-radius: 0 0 var(--radius) var(--radius); overflow: hidden;
+    }
+    .results-rule {
+      padding: 10px 16px; font-size: 13px; color: var(--gray-600);
+      border-bottom: 1px solid var(--gray-100); line-height: 1.6;
+      background: var(--gray-50);
+    }
+    .results-player {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-bottom: 1px solid var(--gray-100); font-size: 14px;
+    }
+    .results-player:last-child { border-bottom: none; }
+    .results-player-name { font-weight: 600; }
+    .loi-notice {
+      background: #FFFBEB; border: 1px solid #FCD34D; border-radius: var(--radius);
+      padding: 1rem 1.25rem; font-size: 13px; color: #92400E; line-height: 1.7;
+      margin-top: 1.25rem;
+    }
+    .loi-notice strong { display: block; font-size: 14px; margin-bottom: 4px; }
+    .print-btn { float: right; }
+
+    /* SUMMARY TAB */
+    .summary-section { margin-bottom: 1.5rem; }
+    .summary-title { font-size: 13px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+    .top-player {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid var(--gray-100);
+    }
+    .top-player:last-child { border-bottom: none; }
+    .top-rank { font-size: 13px; color: var(--gray-400); min-width: 20px; }
+    .top-name { font-weight: 600; font-size: 14px; min-width: 140px; }
+    .bar-bg { flex: 1; background: var(--gray-100); border-radius: 99px; height: 6px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 99px; background: var(--red); }
+    .skill-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 10px;
+    }
+    .skill-name { font-size: 13px; color: var(--gray-600); min-width: 130px; }
+    .pos-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; }
+    .pos-card {
+      background: white; border: 1px solid var(--gray-200);
+      border-radius: var(--radius); padding: 1rem; text-align: center;
+    }
+    .pos-card .num { font-size: 22px; font-weight: 700; margin-top: 8px; }
+    .pos-card .sub { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+
+    /* LOADING */
+    .loading { text-align: center; padding: 2rem; color: var(--gray-400); font-size: 14px; }
+
+    /* TOAST */
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: var(--gray-800); color: white;
+      padding: 10px 16px; border-radius: 8px; font-size: 13px;
+      opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 999;
+    }
+    .toast.show { opacity: 1; }
+
+    /* MOBILE */
+    @media (max-width: 640px) {
+      .main { padding: 1rem; }
+      .stats-row { grid-template-columns: repeat(2,1fr); }
+      .form-row { grid-template-columns: 1fr 1fr; }
+      .form-row .btn { grid-column: span 2; }
+      .header-title { font-size: 14px; }
+      .pos-grid { grid-template-columns: repeat(3,1fr); }
+      .tabs { padding: 0 1rem; overflow-x: auto; }
+      .tab { padding: 12px 14px; font-size: 13px; }
+    }
+
+    @media print {
+      .header, .tabs, .add-card, .filters, .stats-row, .no-print { display: none !important; }
+      .main { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">RW</div>
+    <div>
+      <div class="header-title">Bay Harbor Red Wings</div>
+      <div class="header-sub">Tryout Tracker</div>
+    </div>
+  </div>
+  <div class="live-badge">
+    <div class="live-dot"></div>
+    Live
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('roster',this)">📋 Roster</button>
+  <button class="tab" onclick="showTab('summary',this)">📊 Summary</button>
+  <button class="tab" onclick="showTab('results',this)">🏒 Results</button>
+</div>
+
+<div class="main">
+
+  <!-- ROSTER TAB -->
+  <div id="tab-roster">
+    <div class="stats-row" id="stats-row">
+      <div class="stat-card"><div class="stat-num" id="s-total">—</div><div class="stat-label">Total players</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--green)" id="s-selected">—</div><div class="stat-label">Selected</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--blue)" id="s-called">—</div><div class="stat-label">Called back</div></div>
+      <div class="stat-card"><div class="stat-num" id="s-avg">—</div><div class="stat-label">Group avg</div></div>
+    </div>
+
+    <div class="add-card no-print">
+      <h3>Add player</h3>
+      <div class="import-bar">
+        📁 Import CSV roster:
+        <input type="file" accept=".csv" onchange="importCSV(this)">
+        <span id="import-msg"></span>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Player name</label>
+          <input id="inp-name" placeholder="e.g. Jake Andersen" onkeydown="if(event.key==='Enter')addPlayer()">
+        </div>
+        <div class="form-group">
+          <label>Position</label>
+          <select id="inp-pos">
+            <option value="C">C — Center</option>
+            <option value="LW">LW — Left wing</option>
+            <option value="RW">RW — Right wing</option>
+            <option value="D">D — Defence</option>
+            <option value="G">G — Goalie</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Age</label>
+          <input id="inp-age" type="number" placeholder="17" min="10" max="30">
+        </div>
+        <div class="form-group">
+          <label>Jersey #</label>
+          <input id="inp-jersey" placeholder="e.g. 14" maxlength="3">
+        </div>
+        <button class="btn btn-primary" onclick="addPlayer()">+ Add</button>
+      </div>
+    </div>
+
+    <div class="filters no-print">
+      <span class="filter-label">Filter:</span>
+      <select onchange="renderTable()">
+        <option value="" id="f-pos-opt">All positions</option>
+        <option value="C">C</option><option value="LW">LW</option>
+        <option value="RW">RW</option><option value="D">D</option><option value="G">G</option>
+      </select>
+      <select id="f-desig" onchange="renderTable()">
+        <option value="">All designations</option>
+        <option value="Selected">Selected</option>
+        <option value="Called Back">Called Back</option>
+        <option value="Released">Released</option>
+        <option value="Pending">Pending</option>
+      </select>
+      <select id="f-sort" onchange="renderTable()">
+        <option value="">Sort by…</option>
+        <option value="name">Name A–Z</option>
+        <option value="avg">Avg score ↓</option>
+        <option value="pos">Position</option>
+      </select>
+    </div>
+
+    <div class="table-card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Pos</th>
+              <th>Age</th>
+              <th>Puck handling</th>
+              <th>Shooting</th>
+              <th>Skating</th>
+              <th>Hockey IQ</th>
+              <th>Leadership</th>
+              <th>Avg</th>
+              <th>Designation</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="player-tbody">
+            <tr><td colspan="13"><div class="loading">Loading players...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUMMARY TAB -->
+  <div id="tab-summary" style="display:none">
+    <div class="table-card" style="padding:1.25rem">
+      <div class="summary-section">
+        <div class="summary-title">Top performers</div>
+        <div id="top-list"><div class="loading">Loading...</div></div>
+      </div>
+      <div class="summary-section">
+        <div class="summary-title">Avg score by skill</div>
+        <div id="skill-avgs"></div>
+      </div>
+      <div class="summary-section">
+        <div class="summary-title">Position breakdown</div>
+        <div class="pos-grid" id="pos-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS TAB -->
+  <div id="tab-results" style="display:none">
+    <p style="font-size:13px;color:var(--gray-400);margin-bottom:1rem">
+      Results posted in the viewing area following each session.
+      <button class="btn btn-outline print-btn no-print" onclick="window.print()">🖨 Print results</button>
+    </p>
+
+    <div class="results-group">
+      <div class="results-group-header rh-selected">
+        ✅ Selected for the team
+        <span id="r-count-selected" style="font-size:12px;font-weight:500"></span>
+      </div>
+      <div class="results-group-body">
+        <div class="results-rule">Meet with a club representative regarding next steps and registration. Some players selected on the first day may be asked to return for a second skate.</div>
+        <div id="r-list-selected"></div>
+      </div>
+    </div>
+
+    <div class="results-group">
+      <div class="results-group-header rh-called">
+        🔄 Called back
+        <span id="r-count-called" style="font-size:12px;font-weight:500"></span>
+      </div>
+      <div class="results-group-body">
+        <div class="results-rule">Players will return the following day for an additional evaluation skate.</div>
+        <div id="r-list-called"></div>
+      </div>
+    </div>
+
+    <div class="results-group">
+      <div class="results-group-header rh-released">
+        ❌ Released from tryouts
+        <span id="r-count-released" style="font-size:12px;font-weight:500"></span>
+      </div>
+      <div class="results-group-body">
+        <div class="results-rule">Players may continue attending tryouts with other organizations.</div>
+        <div id="r-list-released"></div>
+      </div>
+    </div>
+
+    <div class="loi-notice">
+      <strong>🏒 If your player is selected</strong>
+      Immediately following tryouts, players and parents/guardians will meet with a club representative in the designated area. A Letter of Intent (LOI) will be completed at that time. Once signed, players may not participate in tryouts for another organization. Financial arrangements and registration must be completed online within 24 hours of team selection. Failure to complete registration prior to the team's next tryout session may result in the player's roster spot being released.
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://befpeekiporrrchzkgtp.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlZnBlZWtpcG9ycnJjaHprZ3RwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MDg0NjYsImV4cCI6MjA5NjA4NDQ2Nn0.CJuwqr7JX_p1CHq5YeUvCml0ITPl_l07ZhRXaS6VZMw';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const SKILLS = ['puck_handling','shooting','skating','hockey_iq','leadership'];
+const SKILL_LABELS = {puck_handling:'Puck handling',shooting:'Shooting',skating:'Skating',hockey_iq:'Hockey IQ',leadership:'Leadership'};
+const POS_VALS = ['C','LW','RW','D','G'];
+const DESIGNATIONS = ['Pending','Selected','Called Back','Released'];
+
+let players = [];
+let channel;
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function avg(p) {
+  const vals = SKILLS.map(s => p[s]).filter(v => v > 0);
+  return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+
+function avgColor(a) {
+  return a >= 4 ? 'avg-high' : a >= 3 ? 'avg-mid' : 'avg-low';
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function stars(id, skill, val) {
+  return [1,2,3,4,5].map(i =>
+    `<span class="star ${i<=val?'on':''}" onclick="updateSkill('${id}','${skill}',${i})" title="${i} star"">★</span>`
+  ).join('');
+}
+
+async function loadPlayers() {
+  const { data, error } = await db.from('players').select('*').order('created_at');
+  if (error) { console.error(error); return; }
+  players = data || [];
+  renderTable();
+  renderSummary();
+  renderResults();
+  updateStats();
+}
+
+function getFiltered() {
+  let list = [...players];
+  const fp = document.querySelector('#tab-roster .filters select')?.value || '';
+  const fd = document.getElementById('f-desig')?.value || '';
+  const so = document.getElementById('f-sort')?.value || '';
+  if (fp) list = list.filter(p => p.position === fp);
+  if (fd) list = list.filter(p => (p.designation||'Pending') === fd);
+  if (so === 'name') list.sort((a,b) => a.name.localeCompare(b.name));
+  else if (so === 'avg') list.sort((a,b) => (avg(b)||0)-(avg(a)||0));
+  else if (so === 'pos') list.sort((a,b) => POS_VALS.indexOf(a.position)-POS_VALS.indexOf(b.position));
+  return list;
+}
+
+function renderTable() {
+  const list = getFiltered();
+  const tbody = document.getElementById('player-tbody');
+  if (!players.length) {
+    tbody.innerHTML = `<tr><td colspan="13"><div class="empty">
+      <div class="empty-icon">🏒</div>
+      <h3>No players yet</h3>
+      <p>Import a CSV or add players manually above</p>
+    </div></td></tr>`;
+    return;
+  }
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="13"><div class="empty"><div class="empty-icon">🔍</div><h3>No players match this filter</h3></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(p => {
+    const a = avg(p);
+    const avgStr = a ? `<span class="${avgColor(a)}">${a.toFixed(1)}</span>` : '<span style="color:var(--gray-400)">—</span>';
+    const desig = p.designation || 'Pending';
+    const desigClass = desig === 'Called Back' ? 'Called' : desig;
+    const desigSel = DESIGNATIONS.map(d =>
+      `<option ${desig===d?'selected':''} value="${d}">${d}</option>`
+    ).join('');
+    return `<tr>
+      <td style="color:var(--gray-400);font-weight:600">${p.jersey_number||'—'}</td>
+      <td style="font-weight:600">${esc(p.name)}</td>
+      <td><span class="pos pos-${p.position}">${p.position}</span></td>
+      <td style="color:var(--gray-400)">${p.age||'—'}</td>
+      ${SKILLS.map(s=>`<td><div class="stars">${stars(p.id,s,p[s]||0)}</div></td>`).join('')}
+      <td>${avgStr}</td>
+      <td>
+        <select class="desig-select" onchange="updateDesig('${p.id}',this.value)">${desigSel}</select>
+      </td>
+      <td><input class="note-input" placeholder="Add note…" value="${esc(p.notes)}" onblur="updateNote('${p.id}',this.value)"></td>
+      <td><button class="del-btn" onclick="deletePlayer('${p.id}')" title="Remove player">✕</button></td>
+    </tr>`;
+  }).join('');
+  updateStats();
+}
+
+function updateStats() {
+  document.getElementById('s-total').textContent = players.length;
+  document.getElementById('s-selected').textContent = players.filter(p=>p.designation==='Selected').length;
+  document.getElementById('s-called').textContent = players.filter(p=>p.designation==='Called Back').length;
+  const rated = players.filter(p=>avg(p)!==null);
+  const oa = rated.length ? (rated.reduce((s,p)=>s+(avg(p)||0),0)/rated.length).toFixed(1) : '—';
+  document.getElementById('s-avg').textContent = oa;
+}
+
+async function addPlayer() {
+  const name = document.getElementById('inp-name').value.trim();
+  if (!name) { document.getElementById('inp-name').focus(); return; }
+  const position = document.getElementById('inp-pos').value;
+  const age = parseInt(document.getElementById('inp-age').value)||null;
+  const jersey_number = document.getElementById('inp-jersey').value.trim()||null;
+  const { error } = await db.from('players').insert([{
+    name, position, age, jersey_number,
+    puck_handling:0, shooting:0, skating:0, hockey_iq:0, leadership:0,
+    designation:'Pending', notes:''
+  }]);
+  if (error) { toast('Error adding player'); return; }
+  document.getElementById('inp-name').value='';
+  document.getElementById('inp-age').value='';
+  document.getElementById('inp-jersey').value='';
+  document.getElementById('inp-name').focus();
+  toast(`${name} added`);
+}
+
+async function importCSV(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    const lines = e.target.result.split('\n').map(l=>l.trim()).filter(Boolean);
+    const header = lines[0].toLowerCase().split(',').map(h=>h.trim());
+    const ni=header.indexOf('name'), pi=header.indexOf('position'), ai=header.indexOf('age'), ji=header.indexOf('jersey');
+    if (ni===-1) { document.getElementById('import-msg').textContent='Error: no "name" column'; return; }
+    const rows = [];
+    for (let i=1;i<lines.length;i++) {
+      const cols = lines[i].split(',').map(c=>c.trim());
+      const name = cols[ni]||''; if (!name) continue;
+      let position = pi!==-1?(cols[pi]||'').toUpperCase():'C';
+      if (!POS_VALS.includes(position)) position='C';
+      const age = ai!==-1?parseInt(cols[ai])||null:null;
+      const jersey_number = ji!==-1?cols[ji]||null:null;
+      rows.push({name,position,age,jersey_number,puck_handling:0,shooting:0,skating:0,hockey_iq:0,leadership:0,designation:'Pending',notes:''});
+    }
+    const { error } = await db.from('players').insert(rows);
+    if (error) { document.getElementById('import-msg').textContent='Import failed'; return; }
+    document.getElementById('import-msg').textContent=`✓ ${rows.length} players imported`;
+    input.value='';
+    toast(`${rows.length} players imported`);
+  };
+  reader.readAsText(file);
+}
+
+async function updateSkill(id, skill, val) {
+  const p = players.find(x=>x.id===id);
+  const newVal = p && p[skill]===val ? 0 : val;
+  await db.from('players').update({[skill]:newVal}).eq('id',id);
+}
+
+async function updateDesig(id, val) {
+  await db.from('players').update({designation:val}).eq('id',id);
+}
+
+async function updateNote(id, val) {
+  await db.from('players').update({notes:val}).eq('id',id);
+}
+
+async function deletePlayer(id) {
+  const p = players.find(x=>x.id===id);
+  if (!confirm(`Remove ${p?.name}?`)) return;
+  await db.from('players').delete().eq('id',id);
+  toast('Player removed');
+}
+
+function renderSummary() {
+  const top = [...players].filter(p=>avg(p)!==null).sort((a,b)=>(avg(b)||0)-(avg(a)||0)).slice(0,5);
+  document.getElementById('top-list').innerHTML = top.length ? top.map((p,i)=>{
+    const a = avg(p);
+    return `<div class="top-player">
+      <span class="top-rank">${i+1}</span>
+      <span class="top-name">${esc(p.name)}</span>
+      <span class="pos pos-${p.position}">${p.position}</span>
+      <div class="bar-bg"><div class="bar-fill" style="width:${Math.round((a/5)*100)}%"></div></div>
+      <span style="font-size:13px;font-weight:700;min-width:28px">${a.toFixed(1)}</span>
+    </div>`;
+  }).join('') : '<p style="color:var(--gray-400);font-size:13px">Rate players to see top performers</p>';
+
+  document.getElementById('skill-avgs').innerHTML = SKILLS.map(s=>{
+    const vals = players.map(p=>p[s]).filter(v=>v>0);
+    const a = vals.length ? vals.reduce((x,y)=>x+y,0)/vals.length : 0;
+    return `<div class="skill-row">
+      <span class="skill-name">${SKILL_LABELS[s]}</span>
+      <div class="bar-bg"><div class="bar-fill" style="width:${Math.round((a/5)*100)}%"></div></div>
+      <span style="font-size:13px;min-width:30px">${a?a.toFixed(1):'—'}</span>
+    </div>`;
+  }).join('');
+
+  const bd={}; POS_VALS.forEach(pos=>bd[pos]={count:0,sel:0});
+  players.forEach(p=>{bd[p.position].count++;if(p.designation==='Selected')bd[p.position].sel++;});
+  document.getElementById('pos-grid').innerHTML = POS_VALS.map(pos=>`
+    <div class="pos-card">
+      <span class="pos pos-${pos}">${pos}</span>
+      <div class="num">${bd[pos].count}</div>
+      <div class="sub">${bd[pos].sel} selected</div>
+    </div>`).join('');
+}
+
+function renderResults() {
+  const groups = {Selected:[],Called:[],Released:[]};
+  players.forEach(p=>{
+    if(p.designation==='Selected') groups.Selected.push(p);
+    else if(p.designation==='Called Back') groups.Called.push(p);
+    else if(p.designation==='Released') groups.Released.push(p);
+  });
+  const row = p => `<div class="results-player">
+    <span class="results-player-name">${esc(p.name)}</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="pos pos-${p.position}">${p.position}</span>
+      ${p.jersey_number?`<span style="font-size:12px;color:var(--gray-400)">#${p.jersey_number}</span>`:''}
+    </div>
+  </div>`;
+  const none = `<div class="results-player" style="color:var(--gray-400);font-size:13px">No players designated yet</div>`;
+  document.getElementById('r-list-selected').innerHTML = groups.Selected.length ? groups.Selected.map(row).join('') : none;
+  document.getElementById('r-list-called').innerHTML = groups.Called.length ? groups.Called.map(row).join('') : none;
+  document.getElementById('r-list-released').innerHTML = groups.Released.length ? groups.Released.map(row).join('') : none;
+  document.getElementById('r-count-selected').textContent = groups.Selected.length ? `${groups.Selected.length} player${groups.Selected.length!==1?'s':''}` : '';
+  document.getElementById('r-count-called').textContent = groups.Called.length ? `${groups.Called.length} player${groups.Called.length!==1?'s':''}` : '';
+  document.getElementById('r-count-released').textContent = groups.Released.length ? `${groups.Released.length} player${groups.Released.length!==1?'s':''}` : '';
+}
+
+function showTab(t, btn) {
+  ['roster','summary','results'].forEach(id=>document.getElementById('tab-'+id).style.display='none');
+  document.getElementById('tab-'+t).style.display='block';
+  document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
+  btn.classList.add('active');
+  if(t==='summary'){renderSummary();}
+  if(t==='results'){renderResults();}
+}
+
+// Real-time sync
+function subscribeRealtime() {
+  channel = db.channel('players-changes')
+    .on('postgres_changes', {event:'*',schema:'public',table:'players'}, () => {
+      loadPlayers();
+    })
+    .subscribe();
+}
+
+// Init
+loadPlayers();
+subscribeRealtime();
+</script>
+</body>
+</html>
